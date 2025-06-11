@@ -1,0 +1,51 @@
+/* Fix filter and search fields overlapping */
+.ag-theme-alpine .ag-floating-filter-full-body {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 4px !important;
+}
+
+/* Center align Sl No column text */
+.ag-theme-alpine .ag-cell[col-id="slNo"] {
+  text-align: center;
+  font-weight: bold;
+  background-color: #f5f5f5;
+}
+
+/* Better font smoothing and prevent extra scrollbars */
+.ag-theme-alpine {
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+  position: relative; /* Ensure proper positioning */
+}
+
+/* Ensure proper scrollbar handling within grid */
+.ag-theme-alpine .ag-body-viewport {
+  overflow-x: auto !important; /* Force horizontal scroll when needed */
+  overflow-y: auto !important; /* Force vertical scroll when needed */
+}
+
+/* Ensure horizontal scrollbar is visible and functional */
+.ag-theme-alpine .ag-body-horizontal-scroll {
+  overflow-x: auto !important;
+  overflow-y: hidden !important;
+  height: 17px; /* Ensure scrollbar has proper height */
+}
+
+/* Ensure vertical scrollbar works properly */
+.ag-theme-alpine .ag-body-vertical-scroll {
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+  width: 17px; /* Ensure scrollbar has proper width */
+}
+
+/* Prevent the center viewport from hiding overflow */
+.ag-theme-alpine .ag-center-cols-viewport {
+  overflow: visible !important; /* Changed from hidden to visible */
+}
+
+/* Ensure the center container allows scrolling */
+.ag-theme-alpine .ag-center-cols-container {
+  overflow: visible !important;
+}
