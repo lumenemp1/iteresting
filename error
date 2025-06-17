@@ -1,0 +1,511 @@
+i am getting minus values sometimes in demand forecasting , is that normal
+
+import pandas as pd
+
+from prophet import Prophet
+
+from datetime import timedelta
+
+import os
+
+
+
+# ---------- CONFIG ----------
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+SOURCE_FILE_MAP = {
+
+    "eon": os.path.join(BASE_DIR, "sorted_file.xlsx"),
+
+    "sdp": os.path.join(BASE_DIR, "sorted_file_sdp.xlsx"),
+
+    "orion": os.path.join(BASE_DIR, "sorted_file_orion.xlsx"),
+
+}
+
+
+
+# ---------- LOAD DATA ----------
+
+def load_data(source_system):
+
+    if source_system not in SOURCE_FILE_MAP:
+
+        raise ValueError(f"Unknown source system: {source_system}")
+
+   
+
+    df = pd.read_excel(SOURCE_FILE_MAP[source_system])
+
+    df.rename(columns={"date": "ds", "total_orders": "y", "product": "product_name"}, inplace=True)
+
+    df["ds"] = pd.to_datetime(df["ds"])
+
+    return df
+
+
+
+def get_all_products_eon():
+
+    df = load_data("eon")
+
+    return sorted(df['product_name'].unique().tolist())
+
+
+
+# ---------- SUMMARY (PRODUCT LIST) ----------
+
+def get_forecast_summary(source_system):
+
+    df = load_data(source_system)
+
+    return sorted(df['product_name'].unique())
+
+
+
+
+
+
+
+# ---------- DETAILED FORECAST (PER PRODUCT) ----------
+
+def get_forecast_detail(source_system, product):
+
+    df = load_data(source_system)
+
+    df_prod = df[df["product_name"] == product][["ds", "y"]].copy()
+
+
+
+    if df_prod.shape[0] >= 60 and df_prod["y"].sum() >= 10:
+
+        model = Prophet(daily_seasonality=True, yearly_seasonality=True)
+
+        model.fit(df_prod)
+
+
+
+        future = model.make_future_dataframe(periods=30)
+
+        forecast = model.predict(future)
+
+
+
+        forecast = forecast[["ds", "yhat", "yhat_lower", "yhat_upper"]].copy()
+
+    else:
+
+        mean_y = df_prod.tail(30)["y"].mean() if df_prod.shape[0] >= 30 else df_prod["y"].mean()
+
+        last_date = df_prod["ds"].max() if not df_prod.empty else pd.to_datetime("2025-05-15")
+
+        future_dates = pd.date_range(start=last_date + timedelta(days=1), periods=30)
+
+
+
+        forecast = pd.DataFrame({
+
+            "ds": future_dates,
+
+            "yhat": [mean_y] * 30,
+
+            "yhat_lower": [mean_y * 0.9] * 30,
+
+            "yhat_upper": [mean_y * 1.1] * 30,
+
+        })
+
+
+
+    # Filter to only return next 30 days
+
+    latest_cutoff = forecast["ds"].max() - timedelta(days=29)
+
+    df_selected = forecast[forecast["ds"] >= latest_cutoff]
+
+
+
+    return {
+
+        "product": product,
+
+        "total_forecast": round(df_selected["yhat"].sum(), 2),
+
+        "forecast_data": df_selected.to_dict(orient="records")
+
+    }
+
+
+
+{
+
+    "forecast_data": [
+
+        {
+
+            "ds": "Sat, 31 May 2025 00:00:00 GMT",
+
+            "yhat": 310.2238156311754,
+
+            "yhat_lower": -1401.084000970811,
+
+            "yhat_upper": 2079.588646405013
+
+        },
+
+        {
+
+            "ds": "Sun, 01 Jun 2025 00:00:00 GMT",
+
+            "yhat": -84.50095541129497,
+
+            "yhat_lower": -1767.336655644267,
+
+            "yhat_upper": 1615.5839446078126
+
+        },
+
+        {
+
+            "ds": "Mon, 02 Jun 2025 00:00:00 GMT",
+
+            "yhat": -43.6376619643338,
+
+            "yhat_lower": -1779.0427272249658,
+
+            "yhat_upper": 1640.576699672727
+
+        },
+
+        {
+
+            "ds": "Tue, 03 Jun 2025 00:00:00 GMT",
+
+            "yhat": -20.070107950584656,
+
+            "yhat_lower": -1777.5516475738932,
+
+            "yhat_upper": 1641.8145037787199
+
+        },
+
+        {
+
+            "ds": "Wed, 04 Jun 2025 00:00:00 GMT",
+
+            "yhat": -219.7026550536068,
+
+            "yhat_lower": -1969.266476716409,
+
+            "yhat_upper": 1517.199089122539
+
+        },
+
+        {
+
+            "ds": "Thu, 05 Jun 2025 00:00:00 GMT",
+
+            "yhat": 126.83202542038453,
+
+            "yhat_lower": -1487.14672291081,
+
+            "yhat_upper": 1887.777780643024
+
+        },
+
+        {
+
+            "ds": "Fri, 06 Jun 2025 00:00:00 GMT",
+
+            "yhat": -157.26828992629942,
+
+            "yhat_lower": -1989.1385176197584,
+
+            "yhat_upper": 1611.4446187811823
+
+        },
+
+        {
+
+            "ds": "Sat, 07 Jun 2025 00:00:00 GMT",
+
+            "yhat": 190.93385355346493,
+
+            "yhat_lower": -1589.53020362097,
+
+            "yhat_upper": 1996.927941377974
+
+        },
+
+        {
+
+            "ds": "Sun, 08 Jun 2025 00:00:00 GMT",
+
+            "yhat": -186.63463367143248,
+
+            "yhat_lower": -1927.7711351338166,
+
+            "yhat_upper": 1509.7722245296684
+
+        },
+
+        {
+
+            "ds": "Mon, 09 Jun 2025 00:00:00 GMT",
+
+            "yhat": -128.25736431368819,
+
+            "yhat_lower": -1750.3911045379189,
+
+            "yhat_upper": 1476.1125769040636
+
+        },
+
+        {
+
+            "ds": "Tue, 10 Jun 2025 00:00:00 GMT",
+
+            "yhat": -87.25173195437048,
+
+            "yhat_lower": -1868.9549572112812,
+
+            "yhat_upper": 1519.431722239531
+
+        },
+
+        {
+
+            "ds": "Wed, 11 Jun 2025 00:00:00 GMT",
+
+            "yhat": -269.9342757528007,
+
+            "yhat_lower": -2011.891845306485,
+
+            "yhat_upper": 1481.621560595091
+
+        },
+
+        {
+
+            "ds": "Thu, 12 Jun 2025 00:00:00 GMT",
+
+            "yhat": 92.68252078494265,
+
+            "yhat_lower": -1476.6978573276292,
+
+            "yhat_upper": 1776.4659543800808
+
+        },
+
+        {
+
+            "ds": "Fri, 13 Jun 2025 00:00:00 GMT",
+
+            "yhat": -176.54124940196436,
+
+            "yhat_lower": -1906.1354520256211,
+
+            "yhat_upper": 1556.872945113012
+
+        },
+
+        {
+
+            "ds": "Sat, 14 Jun 2025 00:00:00 GMT",
+
+            "yhat": 185.0446211961107,
+
+            "yhat_lower": -1533.3539865862408,
+
+            "yhat_upper": 1816.0531893025059
+
+        },
+
+        {
+
+            "ds": "Sun, 15 Jun 2025 00:00:00 GMT",
+
+            "yhat": -180.86313469447254,
+
+            "yhat_lower": -1857.7726401337254,
+
+            "yhat_upper": 1512.21982772624
+
+        },
+
+        {
+
+            "ds": "Mon, 16 Jun 2025 00:00:00 GMT",
+
+            "yhat": -112.71644880369331,
+
+            "yhat_lower": -1711.022134542183,
+
+            "yhat_upper": 1640.7336798538886
+
+        },
+
+        {
+
+            "ds": "Tue, 17 Jun 2025 00:00:00 GMT",
+
+            "yhat": -63.936341531872586,
+
+            "yhat_lower": -1751.7324190085365,
+
+            "yhat_upper": 1477.5017360330899
+
+        },
+
+        {
+
+            "ds": "Wed, 18 Jun 2025 00:00:00 GMT",
+
+            "yhat": -240.8774626611712,
+
+            "yhat_lower": -2002.1688929434395,
+
+            "yhat_upper": 1541.821072471627
+
+        },
+
+        {
+
+            "ds": "Thu, 19 Jun 2025 00:00:00 GMT",
+
+            "yhat": 125.47393089661387,
+
+            "yhat_lower": -1562.7003596293703,
+
+            "yhat_upper": 1769.5157903576478
+
+        },
+
+        {
+
+            "ds": "Fri, 20 Jun 2025 00:00:00 GMT",
+
+            "yhat": -141.93462033404387,
+
+            "yhat_lower": -1904.4081398299754,
+
+            "yhat_upper": 1519.3045864844041
+
+        },
+
+        {
+
+            "ds": "Sat, 21 Jun 2025 00:00:00 GMT",
+
+            "yhat": 219.69082897838985,
+
+            "yhat_lower": -1428.196370774249,
+
+            "yhat_upper": 1970.9728558301574
+
+        },
+
+        {
+
+            "ds": "Sun, 22 Jun 2025 00:00:00 GMT",
+
+            "yhat": -147.7595299345246,
+
+            "yhat_lower": -1884.266446026439,
+
+            "yhat_upper": 1571.235181743989
+
+        },
+
+        {
+
+            "ds": "Mon, 23 Jun 2025 00:00:00 GMT",
+
+            "yhat": -82.5024348156777,
+
+            "yhat_lower": -1768.7041079204078,
+
+            "yhat_upper": 1680.0710761700107
+
+        },
+
+        {
+
+            "ds": "Tue, 24 Jun 2025 00:00:00 GMT",
+
+            "yhat": -37.691113780177716,
+
+            "yhat_lower": -1667.0897652669753,
+
+            "yhat_upper": 1734.5486454004038
+
+        },
+
+        {
+
+            "ds": "Wed, 25 Jun 2025 00:00:00 GMT",
+
+            "yhat": -219.38981897710363,
+
+            "yhat_lower": -1998.7460263318887,
+
+            "yhat_upper": 1524.8304816069353
+
+        },
+
+        {
+
+            "ds": "Thu, 26 Jun 2025 00:00:00 GMT",
+
+            "yhat": 141.7176666144304,
+
+            "yhat_lower": -1478.144211173995,
+
+            "yhat_upper": 1924.9953469610377
+
+        },
+
+        {
+
+            "ds": "Fri, 27 Jun 2025 00:00:00 GMT",
+
+            "yhat": -131.1172978148503,
+
+            "yhat_lower": -1940.1735483710095,
+
+            "yhat_upper": 1633.681533836038
+
+        },
+
+        {
+
+            "ds": "Sat, 28 Jun 2025 00:00:00 GMT",
+
+            "yhat": 225.19379986615922,
+
+            "yhat_lower": -1441.620718872721,
+
+            "yhat_upper": 2043.8360828693294
+
+        },
+
+        {
+
+            "ds": "Sun, 29 Jun 2025 00:00:00 GMT",
+
+            "yhat": -147.18366460719517,
+
+            "yhat_lower": -1918.8307241825735,
+
+            "yhat_upper": 1640.452827956244
+
+        }
+
+    ],
+
+    "product": "Q.ADVAN Z",
+
+    "total_forecast": -1261.98
+
+}
