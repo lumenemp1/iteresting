@@ -1,1 +1,185 @@
+get_product_catalog 
+
+Retrieves the complete list of available products from the system. 
+This tool should be used first to verify product existence before running forecasts
+or analysis on specific products. Returns all product names and details currently in the catalog. 
+
+example output 
+"products": [
+        "Access Channel",
+        "Access Circuit",
+        "Bearer Circuit"......
+],
+    "total_count": 59
+}
+
+
+get_product_bundles
+
+Fetches information about product bundles and package combinations available in the system.
+Use this tool to understand how products are grouped together for sales or promotional purposes.
+
+example output 
+{
+    "bundles": [
+        {
+            "itemsets": [
+                " IP VRP",
+                " Access Circuit",
+                " Customer Access Port",
+                "CPE"
+            ],
+            "length": 4,
+            "support": 0.05444423113841428,
+            "support_count": 1418
+        },
+
+generate_sales_forecast 
+
+Generates demand forecasting and sales predictions for a specific product. Requires product name as input parameter in the request body. 
+Important: Must first verify the product exists 
+using get_product_catalog before executing this tool. 
+Returns predictive sales data and demand projections for the specified product.
+
+output 
+
+{
+    "forecast_data": [
+        {
+            "ds": "Fri, 16 May 2025 00:00:00 GMT",
+            "yhat": 36.383496524860774,
+          
+        },
+        {
+            "ds": "Sat, 17 May 2025 00:00:00 GMT",
+            "yhat": 33.5221203529363,
+  
+        },.....
+        
+            
+        }
+    ],
+    "product": "Voice",
+    "total_forecast": 838.03
+}
+
+
+analyze_product_trends
+Performs trend analysis on a specific product's performance metrics.
+Requires product name as input parameter in the request body. 
+Returns statistical analysis including R-squared value, time range, total sales, trend classification (Stable/Growing/Declining), and trend percentage. 
+Important: Must first verify the product exists using get_product_catalog before executing this tool.
+sample output 
+{
+    "avg_sales": 10.0,
+   "product": "Voice",
+   
+    "time_range_days": 365,
+    "total_sales": 3666,
+    "trend_description": "Stable",
+    "trend_percent": 0.6
+}
+
+get_high_selling_products 
+
+Retrieves a list of high-performing products based on sales volume and performance metrics. 
+This GET endpoint returns products that are currently performing well in the market, helping identify top sellers and successful product lines.
+Use this tool to understand which products are driving the most revenue or have the highest sales velocity.
+
+{
+    "count": 14,
+    "products": [
+        {
+            "classification": "High-Moving",
+            "product": "Access Circuit",
+            "total_orders": 13306
+        },
+        {
+            "classification": "High-Moving",
+            "product": "CPE",
+            "total_orders": 18099
+        },................
+    ],
+    "success": true,
+    "type": "high_selling"
+}
+
+get_low_selling_products 
+
+Retrieves a comprehensive list of underperforming products based on sales volume and performance metrics. 
+This GET endpoint returns products categorized as low moving, very low moving, and obsolete product details. 
+Use this tool to identify products that may need attention, price adjustments, marketing support, inventory management, 
+or potential discontinuation consideration. The response includes detailed categorization to help distinguish between products
+that are simply slow-moving versus those that are obsolete or no longer viable in the market.
+
+{
+    "count": 45,
+    "products": [
+        {
+            "classification": "Obsolete",
+            "product": "Access Channel",
+            "total_orders": 1
+        },
+        {
+            "classification": "Very-Low-Moving",
+            "product": "Bearer Circuit",
+            "total_orders": 55
+        },
+        {
+            "classification": "Obsolete",
+            "product": "Business Group",
+            "total_orders": 0
+        },
+        {
+            "classification": "Very-Low-Moving",
+            "product": "Ethernet Private Line",
+            "total_orders": 7
+        },
+        {
+            "classification": "Obsolete",
+            "product": "FMS Migration",
+            "total_orders": 0
+        },
+        {
+            "classification": "Obsolete",
+            "product": "FMS Migration - T1",
+            "total_orders": 0
+        },
+        {
+            "classification": "Obsolete",
+            "product": "FMS Path",
+            "total_orders": 0
+        },
+        {
+            "classification": "Very-Low-Moving",
+            "product": "IP GateWay - RVA Mobility",
+            "total_orders": 4
+        },
+        {
+            "classification": "Low-Moving",
+            "product": "IP GateWay - RVA Site",
+            "total_orders": 750
+        },
+        {
+            "classification": "Very-Low-Moving",
+            "product": "IP GateWay - RVI",
+            "total_orders": 63
+        },
+        {
+            "classification": "Very-Low-Moving",
+            "product": "IP GateWay - SIA",
+            "total_orders": 14
+        },
+        {
+            "classification": "Obsolete",
+            "product": "Infrastructure",
+            "total_orders": 0
+        },
+        {
+            "classification": "Very-Low-Moving",
+            "product": "Internal/IMT",
+            "total_orders": 172
+        },
+         
+        },
 
