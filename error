@@ -1,3 +1,17 @@
+print(df['Cluster_classification'].unique())
+['High-Moving' 'Avg.-Moving' 'Very-Low-Moving' 'Low-Moving' 'Obsolete']
+
+
+
+
+
+
+
+
+
+
+
+
 # trend_analysis.py
 import pandas as pd
 import numpy as np
