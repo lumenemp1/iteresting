@@ -1,0 +1,766 @@
+import streamlit as st
+import pandas as pd
+import plotly.express as px
+import plotly.graph_objects as go
+from datetime import datetime, timedelta
+import numpy as np
+
+# Page configuration
+st.set_page_config(
+    page_title="SDP Analytics Dashboard",
+    page_icon="📊",
+    layout="wide"
+)
+
+@st.cache_data
+def load_data():
+    """Load and preprocess the data"""
+    try:
+        df = pd.read_csv('SDP_agg_INS copy.csv')
+        # Convert CREATED_MONTH to datetime
+        df['CREATED_MONTH'] = pd.to_datetime(df['CREATED_MONTH'])
+        # Sort by date
+        df = df.sort_values('CREATED_MONTH')
+        return df
+    except FileNotFoundError:
+        st.error("File 'SDP_agg_INS.csv' not found. Please ensure the file is in the same directory.")
+        return None
+    except Exception as e:
+        st.error(f"Error loading data: {str(e)}")
+        return None
+
+def filter_data_by_time_range(df, time_range):
+    """Filter dataframe based on time range selection"""
+    if time_range == "All":
+        return df
+    
+    end_date = df['CREATED_MONTH'].max()
+    
+    if time_range == "6 months":
+        start_date = end_date - timedelta(days=180)
+    elif time_range == "1 year":
+        start_date = end_date - timedelta(days=365)
+    elif time_range == "2 years":
+        start_date = end_date - timedelta(days=730)
+    
+    return df[df['CREATED_MONTH'] >= start_date]
+
+def get_complete_us_mapping():
+    """Return complete US states and territories mapping - ALL 56 entities"""
+    return {
+        # 50 States
+        'Alabama': 'AL', 'Alaska': 'AK', 'Arizona': 'AZ', 'Arkansas': 'AR', 'California': 'CA',
+        'Colorado': 'CO', 'Connecticut': 'CT', 'Delaware': 'DE', 'Florida': 'FL', 'Georgia': 'GA',
+        'Hawaii': 'HI', 'Idaho': 'ID', 'Illinois': 'IL', 'Indiana': 'IN', 'Iowa': 'IA',
+        'Kansas': 'KS', 'Kentucky': 'KY', 'Louisiana': 'LA', 'Maine': 'ME', 'Maryland': 'MD',
+        'Massachusetts': 'MA', 'Michigan': 'MI', 'Minnesota': 'MN', 'Mississippi': 'MS', 'Missouri': 'MO',
+        'Montana': 'MT', 'Nebraska': 'NE', 'Nevada': 'NV', 'New Hampshire': 'NH', 'New Jersey': 'NJ',
+        'New Mexico': 'NM', 'New York': 'NY', 'North Carolina': 'NC', 'North Dakota': 'ND', 'Ohio': 'OH',
+        'Oklahoma': 'OK', 'Oregon': 'OR', 'Pennsylvania': 'PA', 'Rhode Island': 'RI', 'South Carolina': 'SC',
+        'South Dakota': 'SD', 'Tennessee': 'TN', 'Texas': 'TX', 'Utah': 'UT', 'Vermont': 'VT',
+        'Virginia': 'VA', 'Washington': 'WA', 'West Virginia': 'WV', 'Wisconsin': 'WI', 'Wyoming': 'WY',
+        # Federal District
+        'District of Columbia': 'DC',
+        # 5 US Territories
+        'American Samoa': 'AS',
+        'Guam': 'GU',
+        'Northern Mariana Islands': 'MP',
+        'Puerto Rico': 'PR',
+        'U.S. Virgin Islands': 'VI'
+    }
+
+def get_all_56_states():
+    """Get ALL 56 states and territories - GUARANTEED"""
+    return sorted(list(get_complete_us_mapping().keys()))
+
+def get_all_brands_from_data(df):
+    """Get all unique brands from the entire dataset"""
+    return sorted(df['BRAND'].dropna().unique())
+
+def get_all_products_from_data(df):
+    """Get all unique products from the entire dataset"""
+    return sorted(df['PRODUCT'].dropna().unique())
+
+def create_complete_brand_analysis(df, selected_state, metric_column, raw_df=None):
+    """Create complete brand analysis including ALL brands from raw dataset"""
+    # Use raw_df if provided, else use df for getting all brands
+    all_brands = get_all_brands_from_data(raw_df if raw_df is not None else df)
+    
+    # Get data for selected state from filtered DataFrame
+    if selected_state:
+        state_data = df[df['STATE_NAME'] == selected_state]
+    else:
+        state_data = df
+    
+    # Get actual performance data
+    if not state_data.empty:
+        brand_performance = state_data.groupby('BRAND')[metric_column].sum().reset_index()
+    else:
+        brand_performance = pd.DataFrame(columns=['BRAND', metric_column])
+    
+    # Create complete brand dataframe
+    all_brands_df = pd.DataFrame({'BRAND': all_brands})
+    
+    # Merge to include all brands, filling missing with 0
+    complete_analysis = all_brands_df.merge(brand_performance, on='BRAND', how='left')
+    complete_analysis[metric_column] = complete_analysis[metric_column].fillna(0)
+    
+    return complete_analysis.sort_values(metric_column, ascending=True)
+
+def create_complete_product_analysis(df, selected_state, metric_column, raw_df=None):
+    """Create complete product analysis including ALL products from raw dataset"""
+    # Use raw_df if provided, else use df for getting all products
+    all_products = get_all_products_from_data(raw_df if raw_df is not None else df)
+    
+    # Get data for selected state from filtered DataFrame
+    if selected_state:
+        state_data = df[df['STATE_NAME'] == selected_state]
+    else:
+        state_data = df
+    
+    # Get actual performance data
+    if not state_data.empty:
+        product_performance = state_data.groupby('PRODUCT')[metric_column].sum().reset_index()
+    else:
+        product_performance = pd.DataFrame(columns=['PRODUCT', metric_column])
+    
+    # Create complete product dataframe
+    all_products_df = pd.DataFrame({'PRODUCT': all_products})
+    
+    # Merge to include all products, filling missing with 0
+    complete_analysis = all_products_df.merge(product_performance, on='PRODUCT', how='left')
+    complete_analysis[metric_column] = complete_analysis[metric_column].fillna(0)
+    
+    return complete_analysis.sort_values(metric_column, ascending=True)
+
+def create_complete_state_analysis(df, selected_entity, entity_column, metric_column):
+    """Create complete state analysis including ALL 56 states/territories (GUARANTEED)"""
+    # Get ALL 56 states - GUARANTEED
+    all_56_states = get_all_56_states()
+    state_mapping = get_complete_us_mapping()
+    
+    # Get data for selected entity (brand/product)
+    if selected_entity and entity_column:
+        entity_data = df[df[entity_column] == selected_entity]
+    else:
+        entity_data = df
+    
+    # Get actual performance data
+    if not entity_data.empty:
+        state_performance = entity_data.groupby('STATE_NAME')[metric_column].sum().reset_index()
+    else:
+        state_performance = pd.DataFrame(columns=['STATE_NAME', metric_column])
+    
+    # Create complete state dataframe with ALL 56 states
+    all_states_df = pd.DataFrame({'STATE_NAME': all_56_states})
+    
+    # Merge to include all states, filling missing with 0
+    complete_analysis = all_states_df.merge(state_performance, on='STATE_NAME', how='left')
+    complete_analysis[metric_column] = complete_analysis[metric_column].fillna(0)
+    
+    # Add state codes
+    complete_analysis['STATE_CODE'] = complete_analysis['STATE_NAME'].map(state_mapping)
+    
+    # Debug: Print count to verify
+    print(f"Total states in analysis: {len(complete_analysis)}")
+    
+    return complete_analysis
+
+def main():
+    st.title("📊 SDP Analytics Dashboard")
+    st.markdown("---")
+    
+    # Load data
+    df = load_data()
+    if df is None:
+        return
+    
+    # Display state count for verification
+    st.info(f"📍 **Analytics Coverage**: All 56 US States & Territories (including those with 0 sales)")
+    
+    # Time range filter in main area
+    st.subheader("🔍 Filters")
+    col1, col2, col3 = st.columns([1, 1, 2])
+    
+    with col1:
+        time_range_options = ["6 months", "1 year", "2 years", "All"]
+        selected_time_range = st.selectbox(
+            "📅 Select Time Range:",
+            time_range_options,
+            index=1  # Default to 1 year
+        )
+    
+    # Filter data by time range
+    filtered_df = filter_data_by_time_range(df, selected_time_range)
+    
+    if filtered_df.empty:
+        st.warning("No data available for the selected time range.")
+        return
+    
+    st.markdown("---")
+    
+    # Main Analysis Sections
+    tab1, tab2, tab3, tab4 = st.tabs([
+        "🗺️ Location Analysis", 
+        "🏷️ Brand Analysis", 
+        "📦 Product Analysis",
+        "💰 Revenue Analysis"
+    ])
+    
+    with tab1:
+        st.header("Location-wise Analysis (Orders)")
+        
+        # State selector for detailed analysis - ALL 56 states
+        all_states = get_all_56_states()
+        selected_state = st.selectbox(
+            "🏛️ Select a State for Detailed Analysis:",
+            all_states,
+            key="location_state"
+        )
+        
+        if selected_state:
+            state_data = filtered_df[filtered_df['STATE_NAME'] == selected_state]
+            
+            st.subheader(f"📍 Orders Analysis for {selected_state}")
+            
+            # Show state summary metrics
+            col1, col2, col3, col4 = st.columns(4)
+            with col1:
+                st.metric("Total Orders", f"{state_data['Total_orders'].sum():,}")
+            with col2:
+                st.metric("Total Revenue", f"${state_data['MRC_sum'].sum():,.2f}")
+            with col3:
+                st.metric("Active Brands", state_data['BRAND'].nunique() if not state_data.empty else 0)
+            with col4:
+                st.metric("Active Products", state_data['PRODUCT'].nunique() if not state_data.empty else 0)
+            
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                # ALL Brands vs Orders in selected state (including ALL brands with 0 orders)
+                brand_orders_complete = create_complete_brand_analysis(filtered_df, selected_state, 'Total_orders', raw_df=df)
+
+                
+                fig_brand_orders = px.bar(
+                    brand_orders_complete,
+                    x='Total_orders',
+                    y='BRAND',
+                    orientation='h',
+                    title=f'ALL Brands by Orders in {selected_state} (Including Non-performers)',
+                    labels={'Total_orders': 'Total Orders', 'BRAND': 'Brand'},
+                    height=max(400, len(brand_orders_complete) * 20)
+                )
+
+                fig_brand_orders.update_layout(
+        yaxis={
+            'categoryorder': 'total ascending',
+            'tickmode': 'array',
+            'tickvals': list(range(len(brand_orders_complete))),
+            'ticktext': brand_orders_complete['BRAND'].tolist()
+        },
+        showlegend=False
+    )
+                # Debug: Print Plotly figure's y-axis categories
+               
+    
+                st.plotly_chart(fig_brand_orders, use_container_width=True)
+            
+            with col2:
+                # ALL Products vs Orders in selected state (including ALL products with 0 orders)
+                product_orders_complete = create_complete_product_analysis(filtered_df, selected_state, 'Total_orders', raw_df=df)
+                
+                fig_product_orders = px.bar(
+                    product_orders_complete,
+                    x='Total_orders',
+                    y='PRODUCT',
+                    orientation='h',
+                    title=f'ALL Products by Orders in {selected_state} (Including Non-performers)',
+                    labels={'Total_orders': 'Total Orders', 'PRODUCT': 'Product'},
+                    height=max(400, len(product_orders_complete) * 20)
+                )
+
+                fig_product_orders.update_layout(
+        yaxis={
+            'categoryorder': 'total ascending',
+            'tickmode': 'array',
+            'tickvals': list(range(len(product_orders_complete))),
+            'ticktext': product_orders_complete['PRODUCT'].tolist()
+        },
+        showlegend=False
+    )
+              
+                st.plotly_chart(fig_product_orders, use_container_width=True)
+        
+        # Overall state comparison - GUARANTEED ALL 56 STATES
+        st.markdown("---")
+        st.subheader("🌎 State Performance Comparison (ALL 56 States & Territories)")
+        
+        # Create complete state data with ALL 56 states including territories
+        state_orders_complete = create_complete_state_analysis(filtered_df, None, None, 'Total_orders')
+        state_orders_complete = state_orders_complete.sort_values('Total_orders', ascending=False)
+        
+        # Display count verification
+        st.info(f"✅ Showing all {len(state_orders_complete)} states & territories")
+        
+        # Choropleth Map for Orders
+        fig_map_orders = px.choropleth(
+            state_orders_complete,
+            locations='STATE_CODE',
+            color='Total_orders',
+            locationmode='USA-states',
+            scope='usa',
+            title='Total Orders by ALL 56 States & Territories (Map)',
+            labels={'Total_orders': 'Total Orders'},
+            color_continuous_scale='Blues',
+            hover_name='STATE_NAME'
+        )
+        st.plotly_chart(fig_map_orders, use_container_width=True)
+        
+        # Bar chart for Orders
+        fig_state_orders = px.bar(
+            state_orders_complete,
+            x='STATE_NAME',
+            y='Total_orders',
+            title='Total Orders by ALL 56 States & Territories',
+            labels={'Total_orders': 'Total Orders', 'STATE_NAME': 'State'},
+            height=800
+        )
+        fig_state_orders.update_layout(xaxis_tickangle=-45)
+        st.plotly_chart(fig_state_orders, use_container_width=True)
+    
+    with tab2:
+        st.header("Brand Performance Analysis (Orders)")
+        
+        # Brand selector for detailed analysis
+        all_brands = get_all_brands_from_data(filtered_df)
+        selected_brand = st.selectbox(
+            "🏷️ Select a Brand for Detailed Analysis:",
+            all_brands,
+            key="brand_analysis"
+        )
+        
+        if selected_brand:
+            brand_data = filtered_df[filtered_df['BRAND'] == selected_brand]
+            
+            st.subheader(f"📈 Orders Analysis for {selected_brand}")
+            
+            # Show brand summary metrics
+            col1, col2, col3, col4 = st.columns(4)
+            with col1:
+                st.metric("Total Orders", f"{brand_data['Total_orders'].sum():,}")
+            with col2:
+                st.metric("Total Revenue", f"${brand_data['MRC_sum'].sum():,.2f}")
+            with col3:
+                st.metric("Active States", brand_data['STATE_NAME'].nunique())
+            with col4:
+                st.metric("Active Products", brand_data['PRODUCT'].nunique())
+            
+            # Brand performance across ALL 56 states (GUARANTEED)
+            brand_state_complete = create_complete_state_analysis(filtered_df, selected_brand, 'BRAND', 'Total_orders')
+            
+            # Display count verification
+            st.info(f"✅ Analyzing {selected_brand} across all {len(brand_state_complete)} states & territories")
+            
+            # Choropleth Map for Orders
+            fig_map_orders = px.choropleth(
+                brand_state_complete,
+                locations='STATE_CODE',
+                color='Total_orders',
+                locationmode='USA-states',
+                scope='usa',
+                title=f'{selected_brand} - Orders by ALL 56 States & Territories (Map)',
+                labels={'Total_orders': 'Total Orders'},
+                color_continuous_scale='Blues',
+                hover_name='STATE_NAME'
+            )
+            st.plotly_chart(fig_map_orders, use_container_width=True)
+            
+            # Bar chart for Orders
+            brand_orders_sorted = brand_state_complete.sort_values('Total_orders', ascending=True)
+            fig_brand_orders_bar = px.bar(
+                brand_orders_sorted,
+                x='Total_orders',
+                y='STATE_NAME',
+                orientation='h',
+                title=f'{selected_brand} - Orders by ALL 56 States & Territories',
+                labels={'Total_orders': 'Total Orders', 'STATE_NAME': 'State'},
+                height=max(1000, len(brand_orders_sorted) * 18)
+            )
+            st.plotly_chart(fig_brand_orders_bar, use_container_width=True)
+        
+        # Overall brand comparison
+        st.markdown("---")
+        st.subheader("🏆 Brand Performance Comparison (Orders)")
+        
+        # All Brands by Total Orders (ALL brands from dataset)
+        brand_orders_complete = create_complete_brand_analysis(filtered_df, None, 'Total_orders', raw_df=df)
+        
+        fig_brand_orders_overall = px.bar(
+            brand_orders_complete,
+            x='Total_orders',
+            y='BRAND',
+            orientation='h',
+            title='Total Orders by ALL Brands',
+            labels={'Total_orders': 'Total Orders', 'BRAND': 'Brand'},
+            height=max(800, len(brand_orders_complete) * 12)
+        )
+
+        fig_brand_orders_overall.update_layout(
+    yaxis={
+        'categoryorder': 'total ascending',
+        'tickmode': 'array',
+        'tickvals': list(range(len(brand_orders_complete))),
+        'ticktext': brand_orders_complete['BRAND'].tolist()
+    },
+    showlegend=False
+)
+        st.plotly_chart(fig_brand_orders_overall, use_container_width=True)
+    
+    with tab3:
+        st.header("Product Performance Analysis (Orders)")
+        
+        # Product selector for detailed analysis
+        all_products = get_all_products_from_data(filtered_df)
+        selected_product = st.selectbox(
+            "📦 Select a Product for Detailed Analysis:",
+            all_products,
+            key="product_analysis"
+        )
+        
+        if selected_product:
+            product_data = filtered_df[filtered_df['PRODUCT'] == selected_product]
+            
+            st.subheader(f"📊 Orders Analysis for {selected_product}")
+            
+            # Show product summary metrics
+            col1, col2, col3, col4 = st.columns(4)
+            with col1:
+                st.metric("Total Orders", f"{product_data['Total_orders'].sum():,}")
+            with col2:
+                st.metric("Total Revenue", f"${product_data['MRC_sum'].sum():,.2f}")
+            with col3:
+                st.metric("Active States", product_data['STATE_NAME'].nunique())
+            with col4:
+                st.metric("Active Brands", product_data['BRAND'].nunique())
+            
+            # Product performance across ALL 56 states (GUARANTEED)
+            product_state_complete = create_complete_state_analysis(filtered_df, selected_product, 'PRODUCT', 'Total_orders')
+            
+            # Display count verification
+            st.info(f"✅ Analyzing {selected_product} across all {len(product_state_complete)} states & territories")
+            
+            # Choropleth Map for Orders
+            fig_map_orders_product = px.choropleth(
+                product_state_complete,
+                locations='STATE_CODE',
+                color='Total_orders',
+                locationmode='USA-states',
+                scope='usa',
+                title=f'{selected_product} - Orders by ALL 56 States & Territories (Map)',
+                labels={'Total_orders': 'Total Orders'},
+                color_continuous_scale='Oranges',
+                hover_name='STATE_NAME'
+            )
+            st.plotly_chart(fig_map_orders_product, use_container_width=True)
+            
+            # Bar chart for Orders
+            product_orders_sorted = product_state_complete.sort_values('Total_orders', ascending=True)
+            fig_product_orders_bar = px.bar(
+                product_orders_sorted,
+                x='Total_orders',
+                y='STATE_NAME',
+                orientation='h',
+                title=f'{selected_product} - Orders by ALL 56 States & Territories',
+                labels={'Total_orders': 'Total Orders', 'STATE_NAME': 'State'},
+                height=max(1000, len(product_orders_sorted) * 18)
+            )
+            st.plotly_chart(fig_product_orders_bar, use_container_width=True)
+        
+        # Overall product comparison
+        st.markdown("---")
+        st.subheader("📈 Product Performance Comparison (Orders)")
+        
+        # All Products by Total Orders (ALL products from dataset)
+        product_orders_complete = create_complete_product_analysis(filtered_df, None, 'Total_orders', raw_df=df)
+        
+        fig_product_orders_overall = px.bar(
+            product_orders_complete,
+            x='Total_orders',
+            y='PRODUCT',
+            orientation='h',
+            title='Total Orders by ALL Products',
+            labels={'Total_orders': 'Total Orders', 'PRODUCT': 'Product'},
+            height=max(800, len(product_orders_complete) * 15)
+        )
+
+        fig_product_orders_overall.update_layout(
+    yaxis={
+        'categoryorder': 'total ascending',
+        'tickmode': 'array',
+        'tickvals': list(range(len(product_orders_complete))),
+        'ticktext': product_orders_complete['PRODUCT'].tolist()
+    },
+    showlegend=False
+)
+        st.plotly_chart(fig_product_orders_overall, use_container_width=True)
+    
+    with tab4:
+        st.header("Revenue Analysis")
+        
+        # Location Revenue Analysis
+        st.subheader("🗺️ Location-wise Revenue Analysis")
+        
+        # State selector for detailed revenue analysis - ALL 56 states
+        all_states = get_all_56_states()
+        selected_state_revenue = st.selectbox(
+            "🏛️ Select a State for Detailed Revenue Analysis:",
+            all_states,
+            key="location_state_revenue"
+        )
+        
+        if selected_state_revenue:
+            st.subheader(f"💰 Revenue Analysis for {selected_state_revenue}")
+            
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                # ALL Brands vs Revenue in selected state (including ALL brands from raw dataset)
+                brand_revenue_complete = create_complete_brand_analysis(filtered_df, selected_state_revenue, 'MRC_sum', raw_df=df)
+                
+                fig_brand_revenue = px.bar(
+                    brand_revenue_complete,
+                    x='MRC_sum',
+                    y='BRAND',
+                    orientation='h',
+                    title=f'ALL Brands by Revenue in {selected_state_revenue}',
+                    labels={'MRC_sum': 'Revenue ($)', 'BRAND': 'Brand'},
+                    height=max(600, len(brand_revenue_complete) * 20)
+                )
+                fig_brand_revenue.update_layout(
+                    yaxis={
+                        'categoryorder': 'total ascending',
+                        'tickmode': 'array',
+                        'tickvals': list(range(len(brand_revenue_complete))),
+                        'ticktext': brand_revenue_complete['BRAND'].tolist()
+                    },
+                    showlegend=False
+                )
+                st.plotly_chart(fig_brand_revenue, use_container_width=True)
+            
+            with col2:
+                # ALL Products vs Revenue in selected state (including ALL products from raw dataset)
+                product_revenue_complete = create_complete_product_analysis(filtered_df, selected_state_revenue, 'MRC_sum', raw_df=df)
+                
+                fig_product_revenue = px.bar(
+                    product_revenue_complete,
+                    x='MRC_sum',
+                    y='PRODUCT',
+                    orientation='h',
+                    title=f'ALL Products by Revenue in {selected_state_revenue}',
+                    labels={'MRC_sum': 'Revenue ($)', 'PRODUCT': 'Product'},
+                    height=max(600, len(product_revenue_complete) * 20)
+                )
+                fig_product_revenue.update_layout(
+                    yaxis={
+                        'categoryorder': 'total ascending',
+                        'tickmode': 'array',
+                        'tickvals': list(range(len(product_revenue_complete))),
+                        'ticktext': product_revenue_complete['PRODUCT'].tolist()
+                    },
+                    showlegend=False
+                )
+                st.plotly_chart(fig_product_revenue, use_container_width=True)
+        
+        # Overall state revenue comparison - GUARANTEED ALL 56 STATES
+        st.markdown("---")
+        st.subheader("🌎 State Revenue Performance (ALL 56 States & Territories)")
+        
+        # Create complete state revenue data
+        state_revenue_complete = create_complete_state_analysis(filtered_df, None, None, 'MRC_sum')
+        
+        # Display count verification
+        st.info(f"✅ Showing revenue for all {len(state_revenue_complete)} states & territories")
+        
+        # Choropleth Map for Revenue
+        fig_map_revenue = px.choropleth(
+            state_revenue_complete,
+            locations='STATE_CODE',
+            color='MRC_sum',
+            locationmode='USA-states',
+            scope='usa',
+            title='Total Revenue by ALL 56 States & Territories (Map)',
+            labels={'MRC_sum': 'Revenue ($)'},
+            color_continuous_scale='Greens',
+            hover_name='STATE_NAME'
+        )
+        st.plotly_chart(fig_map_revenue, use_container_width=True)
+        
+        # Bar chart for Revenue
+        state_revenue_sorted = state_revenue_complete.sort_values('MRC_sum', ascending=False)
+        fig_state_revenue = px.bar(
+            state_revenue_sorted,
+            x='STATE_NAME',
+            y='MRC_sum',
+            title='Total Revenue by ALL 56 States & Territories',
+            labels={'MRC_sum': 'Revenue ($)', 'STATE_NAME': 'State'},
+            height=800
+        )
+        fig_state_revenue.update_layout(xaxis_tickangle=-45)
+        st.plotly_chart(fig_state_revenue, use_container_width=True)
+        
+        # Brand Revenue Analysis
+        st.markdown("---")
+        st.subheader("🏷️ Brand Revenue Analysis")
+        
+        # Brand selector for detailed revenue analysis
+        all_brands = get_all_brands_from_data(df)  # Use raw_df to ensure all brands
+        selected_brand_revenue = st.selectbox(
+            "🏷️ Select a Brand for Detailed Revenue Analysis:",
+            all_brands,
+            key="brand_analysis_revenue"
+        )
+        
+        if selected_brand_revenue:
+            st.subheader(f"💰 Revenue Analysis for {selected_brand_revenue}")
+            
+            # Brand revenue performance across ALL 56 states (GUARANTEED)
+            brand_state_complete = create_complete_state_analysis(filtered_df, selected_brand_revenue, 'BRAND', 'MRC_sum')
+            
+            # Display count verification
+            st.info(f"✅ Analyzing {selected_brand_revenue} revenue across all {len(brand_state_complete)} states & territories")
+            
+            # Choropleth Map for Revenue
+            fig_map_revenue = px.choropleth(
+                brand_state_complete,
+                locations='STATE_CODE',
+                color='MRC_sum',
+                locationmode='USA-states',
+                scope='usa',
+                title=f'{selected_brand_revenue} - Revenue by ALL 56 States & Territories (Map)',
+                labels={'MRC_sum': 'Revenue ($)'},
+                color_continuous_scale='Greens',
+                hover_name='STATE_NAME'
+            )
+            st.plotly_chart(fig_map_revenue, use_container_width=True)
+            
+            # Bar chart for Revenue
+            brand_revenue_sorted = brand_state_complete.sort_values('MRC_sum', ascending=True)
+            fig_brand_revenue_bar = px.bar(
+                brand_revenue_sorted,
+                x='MRC_sum',
+                y='STATE_NAME',
+                orientation='h',
+                title=f'{selected_brand_revenue} - Revenue by ALL 56 States & Territories',
+                labels={'MRC_sum': 'Revenue ($)', 'STATE_NAME': 'State'},
+                height=max(1000, len(brand_revenue_sorted) * 18)
+            )
+            st.plotly_chart(fig_brand_revenue_bar, use_container_width=True)
+        
+        # Overall brand revenue comparison
+        st.markdown("---")
+        st.subheader("🏆 Brand Revenue Comparison")
+        
+        # All Brands by Total Revenue (including ALL brands from raw dataset)
+        brand_revenue_complete = create_complete_brand_analysis(filtered_df, None, 'MRC_sum', raw_df=df)
+        
+        fig_brand_revenue_overall = px.bar(
+            brand_revenue_complete,
+            x='MRC_sum',
+            y='BRAND',
+            orientation='h',
+            title='Total Revenue by ALL Brands',
+            labels={'MRC_sum': 'Revenue ($)', 'BRAND': 'Brand'},
+            height=max(800, len(brand_revenue_complete) * 12)
+        )
+        fig_brand_revenue_overall.update_layout(
+            yaxis={
+                'categoryorder': 'total ascending',
+                'tickmode': 'array',
+                'tickvals': list(range(len(brand_revenue_complete))),
+                'ticktext': brand_revenue_complete['BRAND'].tolist()
+            },
+            showlegend=False
+        )
+        st.plotly_chart(fig_brand_revenue_overall, use_container_width=True)
+        
+        # Product Revenue Analysis
+        st.markdown("---")
+        st.subheader("📦 Product Revenue Analysis")
+        
+        # Product selector for detailed revenue analysis
+        all_products = get_all_products_from_data(df)  # Use raw_df to ensure all products
+        selected_product_revenue = st.selectbox(
+            "📦 Select a Product for Detailed Revenue Analysis:",
+            all_products,
+            key="product_analysis_revenue"
+        )
+        
+        if selected_product_revenue:
+            st.subheader(f"💰 Revenue Analysis for {selected_product_revenue}")
+            
+            # Product revenue performance across ALL 56 states (GUARANTEED)
+            product_state_complete = create_complete_state_analysis(filtered_df, selected_product_revenue, 'PRODUCT', 'MRC_sum')
+            
+            # Display count verification
+            st.info(f"✅ Analyzing {selected_product_revenue} revenue across all {len(product_state_complete)} states & territories")
+            
+            # Choropleth Map for Revenue
+            fig_map_revenue_product = px.choropleth(
+                product_state_complete,
+                locations='STATE_CODE',
+                color='MRC_sum',
+                locationmode='USA-states',
+                scope='usa',
+                title=f'{selected_product_revenue} - Revenue by ALL 56 States & Territories (Map)',
+                labels={'MRC_sum': 'Revenue ($)'},
+                color_continuous_scale='Purples',
+                hover_name='STATE_NAME'
+            )
+            st.plotly_chart(fig_map_revenue_product, use_container_width=True)
+            
+            # Bar chart for Revenue
+            product_revenue_sorted = product_state_complete.sort_values('MRC_sum', ascending=True)
+            fig_product_revenue_bar = px.bar(
+                product_revenue_sorted,
+                x='MRC_sum',
+                y='STATE_NAME',
+                orientation='h',
+                title=f'{selected_product_revenue} - Revenue by ALL 56 States & Territories',
+                labels={'MRC_sum': 'Revenue ($)', 'STATE_NAME': 'State'},
+                height=max(1000, len(product_revenue_sorted) * 18)
+            )
+            st.plotly_chart(fig_product_revenue_bar, use_container_width=True)
+        
+        # Overall product revenue comparison
+        st.markdown("---")
+        st.subheader("📈 Product Revenue Comparison")
+        
+        # All Products by Total Revenue (including ALL products from raw dataset)
+        product_revenue_complete = create_complete_product_analysis(filtered_df, None, 'MRC_sum', raw_df=df)
+        
+        fig_product_revenue_overall = px.bar(
+            product_revenue_complete,
+            x='MRC_sum',
+            y='PRODUCT',
+            orientation='h',
+            title='Total Revenue by ALL Products',
+            labels={'MRC_sum': 'Revenue ($)', 'PRODUCT': 'Product'},
+            height=max(800, len(product_revenue_complete) * 15)
+        )
+        fig_product_revenue_overall.update_layout(
+            yaxis={
+                'categoryorder': 'total ascending',
+                'tickmode': 'array',
+                'tickvals': list(range(len(product_revenue_complete))),
+                'ticktext': product_revenue_complete['PRODUCT'].tolist()
+            },
+            showlegend=False
+        )
+        st.plotly_chart(fig_product_revenue_overall, use_container_width=True)
+    
+    # Footer
+    st.markdown("---")
+    st.markdown("📊 **SDP Analytics Dashboard** | Complete Business Intelligence with ALL Entities")
+
+if __name__ == "__main__":
+    main()
