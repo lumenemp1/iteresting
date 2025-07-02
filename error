@@ -1,3 +1,59 @@
+UnicodeEncodeError: 'utf-8' codec can't encode characters in position 0-1: surrogates not allowed
+Traceback:
+File "C:\Users\AD54619\Text2Sql\location\sdp_analysis.py", line 140, in <module>
+    main()
+File "C:\Users\AD54619\Text2Sql\location\sdp_analysis.py", line 84, in main
+    st.title("\ud83d\udcca SDP Analytics Dashboard")
+File "C:\Users\AD54619\Text2Sql\new_env\Lib\site-packages\streamlit\runtime\metrics_util.py", line 444, in wrapped_func
+    result = non_optional_func(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+File "C:\Users\AD54619\Text2Sql\new_env\Lib\site-packages\streamlit\elements\heading.py", line 239, in title
+    HeadingMixin._create_heading_proto(
+File "C:\Users\AD54619\Text2Sql\new_env\Lib\site-packages\streamlit\elements\heading.py", line 280, in _create_heading_proto
+    proto.body =
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import Plot from 'react-plotly.js';
