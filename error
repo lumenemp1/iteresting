@@ -1,3 +1,13 @@
+The trend analysis graph in the script is a dual-axis line chart that visualizes the trends of Total Orders and Monthly Recurring Charges (MRC) over time, aggregated by month. It allows users to observe patterns and changes in these metrics based on applied filters like order type, location, time, brand, and product.
+
+
+
+
+
+
+
+
+
 # SDP Analytics Dashboard - Optimized Version
 
 import streamlit as st
