@@ -108,3 +108,37 @@ def get_data_statistics(source_system):
         })
     
     return stats
+
+
+
+app.py
+
+### ----- DEMAND FORECASTING ROUTES ----- ###
+@app.route("/forecast/summary", methods=["POST"])
+def forecast_summary():
+    data = request.get_json()
+    source = data.get("source_system")
+
+    if not source:
+        return jsonify({"error": "Missing source_system"}), 400
+
+    try:
+        product_list = get_forecast_summary(source)
+        return jsonify({"products": product_list})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/forecast/detail", methods=["POST"])
+def forecast_detail():
+    data = request.get_json()
+    source = data.get("source_system")
+    product = data.get("product")
+
+    if not source or not product:
+        return jsonify({"error": "Missing source_system or product"}), 400
+
+    try:
+        forecast = get_forecast_detail(source, product)
+        return jsonify(forecast)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
